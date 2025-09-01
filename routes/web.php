@@ -52,12 +52,14 @@ Route::get('/filter-search', function (Client $client) {
     $results = $client->collections['books']->documents->search([
 
         'q' => request('q'),
-        'query_by' => 'title,authors',
+        'query_by' => 'title',
         'sort_by ' => '_text_match:desc,ratings_count:desc',
         'per_page' => 50,
+        // 'filter_by' => 'authors:=Blake Crouch',
+        'filter_by' => 'authors:=Blake Crouch',
     ]);
 
-    $titles = collect($results['hits'])->map(fn ($hit) => $hit['document']['title']);
+    // $titles = collect($results['hits'])->map(fn ($hit) => $hit['document']['title']);
 
-    return $titles;
+    return $results;
 });
