@@ -31,7 +31,6 @@ Route::get('/import-collection', function (Client $client) {
     return 'Books imported';
 
 });
-
 Route::get('/search-collection', function (Client $client) {
     $results = $client->collections['books']->documents->search([
 
@@ -52,14 +51,59 @@ Route::get('/filter-search', function (Client $client) {
     $results = $client->collections['books']->documents->search([
 
         'q' => request('q'),
-        'query_by' => 'title',
+        'query_by' => 'title,authors',
         'sort_by ' => '_text_match:desc,ratings_count:desc',
         'per_page' => 50,
-        // 'filter_by' => 'authors:=Blake Crouch',
-        'filter_by' => 'authors:=Blake Crouch',
+        'fitler_by' => "publication_year:['publication_year:[1990,2000]|| publication_year:[2010..2020]",
     ]);
 
-    // $titles = collect($results['hits'])->map(fn ($hit) => $hit['document']['title']);
+    //    $titles = collect($results['hits'])->map(fn ($hit) => $hit['document']['title']);
 
     return $results;
+});
+
+Route::get('/faceting', function (Client $client) {
+    $results = $client->collections['books']->documents->search([
+        'q' => request('q'),
+        'query_by' => 'title',
+        'sort_by' => '_text_match:desc,ratings_count:desc',
+        'per_page' => 50,
+        'facet_by' => 'authors',
+    ]);
+
+    return $results;
+});
+
+Route::get('/searchs', function (Client $client) {
+    $query = request('q', '*');
+
+    $searchParams = [
+        'q' => $query,
+        'query_by' => 'title',
+        'facet_by' => 'authors',
+    ];
+
+    if (request()->filled('filters.authors')) {
+        $searchParams['filter_by'] = 'authors:=['.implode(',', request('filters.authors')).']';
+    }
+
+    $results = $client->collections['books']->documents->search($searchParams);
+
+    $facets = collect($results['facet_counts'])->map(function ($facet) {
+        return [
+            'name' => $facet['field_name'],
+            'filters' => collect($facet['counts'])->map(function ($filter) {
+                return [
+                    'count' => $filter['count'],
+                    'name' => $filter['value'],
+                    'id' => strtolower(str_replace(['', ''], ['', ''], $filter['value'])),
+                ];
+            })->toArray(),
+
+        ];
+    });
+
+    $results = collect($results['hits'])->pluck('highlights')->flatten(1)->pluck('snippet');
+
+    return view('search', ['results' => $results, 'facets' => $facets]);
 });
